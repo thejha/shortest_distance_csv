@@ -1,0 +1,100 @@
+# CSV Route Optimization System - Requirements
+# ===========================================
+# This file contains all Python dependencies required to run the route optimization system.
+# Install with: pip install -r requirements.txt
+
+# =============================================================================
+# CORE DEPENDENCIES (Required)
+# =============================================================================
+
+# Web Framework
+Flask==2.3.2                    # Main web framework for the dashboard and API
+Werkzeug==2.3.7                # WSGI utilities (Flask dependency)
+
+# Database Connectivity
+mysql-connector-python==8.1.0  # MySQL database connector for job tracking and vehicle configs
+
+# Data Processing & Analysis
+pandas==2.0.3                  # CSV file processing, data manipulation, and analysis
+numpy==1.24.3                  # Numerical computations and array operations
+
+# HTTP Requests
+requests==2.31.0               # API calls to external services (OlaMaps, Google Maps)
+
+# Date/Time Handling
+pytz==2023.3                   # Timezone handling for IST timestamps
+
+# =============================================================================
+# OPTIONAL DEPENDENCIES (Enhanced Features)
+# =============================================================================
+
+# Machine Learning & Clustering (for HDBSCAN algorithm)
+hdbscan==0.8.33                # HDBSCAN clustering algorithm for advanced route optimization
+scikit-learn==1.3.0            # Machine learning utilities (StandardScaler, silhouette_score)
+
+# Data Visualization (for analytics and reporting)
+matplotlib==3.7.2               # Plotting and visualization for model comparison reports
+seaborn==0.12.2                # Statistical data visualization
+
+# Google Maps API (for distance calculations)
+googlemaps==4.10.0             # Google Maps API client for distance matrix calculations
+
+# =============================================================================
+# DEVELOPMENT & DEPLOYMENT (Optional)
+# =============================================================================
+
+# Development & Testing
+pytest==7.4.0                  # Testing framework
+pytest-cov==4.1.0              # Coverage reporting
+
+# Production Server
+gunicorn==21.2.0                # WSGI HTTP server for production deployment
+
+# Environment Management
+python-dotenv==1.0.0           # Load environment variables from .env file
+
+# =============================================================================
+# INSTALLATION NOTES
+# =============================================================================
+# 
+# Minimum Installation (Core features only):
+#   pip install Flask==2.3.2 Werkzeug==2.3.7 mysql-connector-python==8.1.0 pandas==2.0.3 numpy==1.24.3 requests==2.31.0 pytz==2023.3
+#
+# Full Installation (All features including HDBSCAN and visualization):
+#   pip install -r requirements.txt
+#
+# Features that require optional dependencies:
+#   - HDBSCAN clustering algorithm (hdbscan, scikit-learn)
+#   - Google Maps distance calculations (googlemaps)
+#   - Model comparison visualization (matplotlib, seaborn)
+#   - Production deployment (gunicorn)
+#
+# The system will gracefully degrade if optional dependencies are missing:
+#   - Falls back to Z-score algorithm if HDBSCAN unavailable
+#   - Uses OlaMaps API if Google Maps unavailable
+#   - Skips visualization features if matplotlib/seaborn unavailable
+#
+# =============================================================================
+# SYSTEM REQUIREMENTS
+# =============================================================================
+# 
+# Python Version: 3.8 or higher
+# Operating System: Windows, Linux, macOS
+# Database: MySQL 5.7 or higher
+# Memory: Minimum 4GB RAM (8GB recommended for large datasets)
+# Storage: 1GB free space for uploads and results
+#
+# =============================================================================
+# CONFIGURATION
+# =============================================================================
+# 
+# Database Configuration (set via environment variables):
+#   DB_HOST=localhost
+#   DB_USER=root
+#   DB_PASSWORD=your_password
+#   DB_NAME=route_optimization
+#
+# Google Maps API (optional):
+#   GOOGLE_MAPS_API_KEY=your_api_key
+#
+# =============================================================================

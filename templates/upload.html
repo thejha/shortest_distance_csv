@@ -1,0 +1,256 @@
+{% extends "base.html" %}
+
+{% block title %}Upload CSV - Route Optimization{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1><i class="fas fa-upload me-2"></i>Upload CSV File</h1>
+            <a href="{{ url_for('index') }}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Upload Form -->
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-file-csv me-2"></i>Select CSV File
+                </h5>
+            </div>
+            <div class="card-body">
+                <form method="POST" enctype="multipart/form-data" id="upload-form">
+                    <div class="mb-4">
+                        <label for="hub_id" class="form-label">Select Hub</label>
+                        <select class="form-select" id="hub_id" name="hub_id" required>
+                            <option value="" selected disabled>Choose a hub...</option>
+                            {% for m in hub_mapping|sort(attribute='hub_id') %}
+                                <option value="{{ m.hub_id }}">{{ m.hub_id }} — {{ m.hub_name }}</option>
+                            {% endfor %}
+                        </select>
+                        <div class="form-text">
+                            <i class="fas fa-map-pin me-1"></i>
+                            Hub is now chosen here; remove hub_id column from your CSV
+                        </div>
+                    </div>
+                    <div class="mb-4">
+                        <label for="file" class="form-label">Choose CSV File</label>
+                        <input type="file" class="form-control" id="file" name="file" accept=".csv" required>
+                        <div class="form-text">
+                            <i class="fas fa-info-circle me-1"></i>
+                            Only CSV files are allowed. Maximum file size: 10MB
+                        </div>
+                    </div>
+                    
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary btn-lg" id="upload-btn">
+                            <i class="fas fa-upload me-2"></i>Upload and Validate
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <!-- CSV Format Guide -->
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-info-circle me-2"></i>CSV Format Guide
+                </h5>
+            </div>
+            <div class="card-body">
+                <h6>Required Columns:</h6>
+                <ul class="list-unstyled">
+                    <li><code>pickup_number</code> - Unique identifier (e.g., P001)</li>
+                    <li><code>material_quantity</code> - Quantity/weight for routing</li>
+                    <li><code>city_name</code> - City</li>
+                    <li><code>state_name</code> - State</li>
+                    <li><code>location_pincode</code> - Pincode</li>
+                </ul>
+                
+                <hr>
+                
+                <h6>Sample Data:</h6>
+                <div class="bg-light p-3 rounded">
+                    <small>
+                        <code>
+                            pickup_number,material_quantity,city_name,state_name,location_pincode<br>
+                            P001,150,Chennai,Tamil Nadu,600001<br>
+                            P002,200,Chennai,Tamil Nadu,600002
+                        </code>
+                    </small>
+                </div>
+                
+                <hr>
+                
+                <div class="text-center">
+                    <a href="{{ url_for('download_sample') }}" class="btn btn-outline-primary btn-sm">
+                        <i class="fas fa-download me-1"></i>Download Sample CSV
+                    </a>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Upload Progress -->
+        <div class="card mt-3" id="progress-card" style="display: none;">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-spinner fa-spin me-2"></i>Uploading...
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="progress mb-3">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                         role="progressbar" style="width: 0%" id="upload-progress"></div>
+                </div>
+                <p class="text-muted mb-0" id="upload-status">Preparing upload...</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Validation Results Modal -->
+<div class="modal fade" id="validationModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-check-circle me-2"></i>CSV Validation Results
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="validation-content">
+                <!-- Validation results will be loaded here -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" id="proceed-btn" style="display: none;">
+                    <i class="fas fa-arrow-right me-2"></i>Proceed to Vehicle Configuration
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('upload-form');
+    const fileInput = document.getElementById('file');
+    const uploadBtn = document.getElementById('upload-btn');
+    const progressCard = document.getElementById('progress-card');
+    const uploadProgress = document.getElementById('upload-progress');
+    const uploadStatus = document.getElementById('upload-status');
+    
+    // File input change handler
+    fileInput.addEventListener('change', function() {
+        const file = this.files[0];
+        if (file) {
+            if (file.type !== 'text/csv' && !file.name.endsWith('.csv')) {
+                alert('Please select a CSV file.');
+                this.value = '';
+                return;
+            }
+            
+            if (file.size > 10 * 1024 * 1024) { // 10MB
+                alert('File size must be less than 10MB.');
+                this.value = '';
+                return;
+            }
+            
+            uploadBtn.disabled = false;
+        }
+    });
+    
+    // Form submission handler
+    form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const file = fileInput.files[0];
+        if (!file) {
+            alert('Please select a file first.');
+            return;
+        }
+        
+        // Show progress
+        progressCard.style.display = 'block';
+        uploadBtn.disabled = true;
+        
+        // Simulate upload progress
+        let progress = 0;
+        const interval = setInterval(() => {
+            progress += Math.random() * 30;
+            if (progress > 90) progress = 90;
+            
+            uploadProgress.style.width = progress + '%';
+            uploadStatus.textContent = progress < 50 ? 'Uploading file...' : 'Validating CSV structure...';
+            
+            if (progress >= 90) {
+                clearInterval(interval);
+            }
+        }, 200);
+        
+        // Submit form
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('hub_id', document.getElementById('hub_id').value);
+        
+        fetch('{{ url_for("upload_csv") }}', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => {
+            clearInterval(interval);
+            uploadProgress.style.width = '100%';
+            uploadStatus.textContent = 'Upload complete!';
+            
+            if (response.redirected) {
+                // Server redirected us, follow the redirect
+                window.location.href = response.url;
+            } else {
+                return response.text().then(html => {
+                    // Parse response and show validation results
+                    setTimeout(() => {
+                        progressCard.style.display = 'none';
+                        uploadBtn.disabled = false;
+                        
+                        // Create a temporary div to parse the response
+                        const tempDiv = document.createElement('div');
+                        tempDiv.innerHTML = html;
+                        
+                        // Check for validation results
+                        const validationContent = tempDiv.querySelector('#validation-content');
+                        if (validationContent) {
+                            document.getElementById('validation-content').innerHTML = validationContent.innerHTML;
+                            const modal = new bootstrap.Modal(document.getElementById('validationModal'));
+                            modal.show();
+                        } else {
+                            // If no validation modal, check if we got vehicle config page
+                            const vehicleConfigForm = tempDiv.querySelector('form[action*="optimize"]');
+                            if (vehicleConfigForm) {
+                                // We got the vehicle config page, redirect to it
+                                window.location.href = '{{ url_for("vehicle_config", filename="PLACEHOLDER") }}'.replace('PLACEHOLDER', file.name) + '?hub_id=' + document.getElementById('hub_id').value;
+                            }
+                        }
+                    }, 1000);
+                });
+            }
+        })
+        .catch(error => {
+            clearInterval(interval);
+            progressCard.style.display = 'none';
+            uploadBtn.disabled = false;
+            alert('Upload failed: ' + error.message);
+        });
+    });
+});
+</script>
+{% endblock %}

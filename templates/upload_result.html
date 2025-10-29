@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+
+{% block title %}Upload Result - Route Optimization{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1><i class="fas fa-file-csv me-2"></i>Upload Result</h1>
+            <a href="{{ url_for('upload_csv') }}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left me-2"></i>Back to Upload
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-info-circle me-2"></i>Validation Results for {{ filename }}
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if validation.is_valid %}
+                    <div class="alert alert-success">
+                        <i class="fas fa-check-circle me-2"></i>
+                        <strong>Success!</strong> CSV file is valid and ready for processing.
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6>File Information:</h6>
+                            <ul class="list-unstyled">
+                                <li><strong>Filename:</strong> {{ filename }}</li>
+                                <li><strong>Rows:</strong> {{ validation.row_count }}</li>
+                                <li><strong>Columns:</strong> {{ validation.columns|length }}</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <h6>Detected Columns:</h6>
+                            <ul class="list-unstyled">
+                                {% for col in validation.columns %}
+                                    <li><code>{{ col }}</code></li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                    </div>
+                    
+                    {% if validation.warnings %}
+                        <div class="alert alert-warning">
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            <strong>Warnings:</strong>
+                            <ul class="mb-0">
+                                {% for warning in validation.warnings %}
+                                    <li>{{ warning }}</li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                    {% endif %}
+                    
+                    <div class="text-center mt-4">
+                        <a href="{{ url_for('vehicle_config', filename=filename) }}" class="btn btn-primary btn-lg">
+                            <i class="fas fa-truck me-2"></i>Configure Vehicles
+                        </a>
+                    </div>
+                    
+                {% else %}
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        <strong>Validation Failed!</strong> Please fix the following errors:
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6>File Information:</h6>
+                            <ul class="list-unstyled">
+                                <li><strong>Filename:</strong> {{ filename }}</li>
+                                <li><strong>Rows:</strong> {{ validation.row_count }}</li>
+                                <li><strong>Columns:</strong> {{ validation.columns|length }}</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <h6>Detected Columns:</h6>
+                            <ul class="list-unstyled">
+                                {% for col in validation.columns %}
+                                    <li><code>{{ col }}</code></li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                    </div>
+                    
+                    <div class="alert alert-danger">
+                        <h6><i class="fas fa-times-circle me-2"></i>Errors:</h6>
+                        <ul class="mb-0">
+                            {% for error in validation.errors %}
+                                <li>{{ error }}</li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                    
+                    {% if validation.warnings %}
+                        <div class="alert alert-warning">
+                            <h6><i class="fas fa-exclamation-triangle me-2"></i>Warnings:</h6>
+                            <ul class="mb-0">
+                                {% for warning in validation.warnings %}
+                                    <li>{{ warning }}</li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                    {% endif %}
+                    
+                    <div class="text-center mt-4">
+                        <a href="{{ url_for('upload_csv') }}" class="btn btn-primary">
+                            <i class="fas fa-upload me-2"></i>Try Again
+                        </a>
+                        <a href="{{ url_for('download_sample') }}" class="btn btn-outline-primary ms-2">
+                            <i class="fas fa-download me-2"></i>Download Sample CSV
+                        </a>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

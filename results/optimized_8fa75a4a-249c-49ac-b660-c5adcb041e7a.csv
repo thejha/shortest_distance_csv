@@ -1,0 +1,5 @@
+trip_number,vehicle_type,stop_sequence,location,pickup_numbers,weight_kg,total_distance_km,total_weight_kg,cost_inr,cost_per_kg,algorithm_used
+1,14ft,1,KERALA+678006,42A445,1879.44,151.07,3046.07,3474.6099999999997,1.1406861956553853,Z-Score
+1,14ft,2,KERALA+678014,"420599,42A201",795.53,,,,,
+1,14ft,3,KERALA+678501,42A039,371.1,,,,,
+2,Dost-2,1,KERALA+679105,42A032,1219.81,185.45,1219.81,2967.2,2.4325099810626245,Z-Score

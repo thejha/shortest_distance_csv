@@ -1,0 +1,21 @@
+pickup_number,material_quantity,city_name,state_name,location_pincode,hub_id
+P001,150,Chennai,Tamil Nadu,600001,8
+P002,200,Chennai,Tamil Nadu,600002,8
+P003,300,Chennai,Tamil Nadu,600003,8
+P004,120,Chennai,Tamil Nadu,600004,8
+P005,450,Chennai,Tamil Nadu,600005,8
+P006,180,Bangalore,Karnataka,560001,8
+P007,250,Bangalore,Karnataka,560002,8
+P008,350,Bangalore,Karnataka,560003,8
+P009,100,Bangalore,Karnataka,560004,8
+P010,400,Bangalore,Karnataka,560005,8
+P011,280,Mumbai,Maharashtra,400001,8
+P012,160,Mumbai,Maharashtra,400002,8
+P013,220,Mumbai,Maharashtra,400003,8
+P014,380,Mumbai,Maharashtra,400004,8
+P015,140,Mumbai,Maharashtra,400005,8
+P016,320,Delhi,Delhi,110001,8
+P017,190,Delhi,Delhi,110002,8
+P018,270,Delhi,Delhi,110003,8
+P019,310,Delhi,Delhi,110004,8
+P020,170,Delhi,Delhi,110005,8

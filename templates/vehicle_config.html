@@ -1,0 +1,356 @@
+{% extends "base.html" %}
+
+{% block title %}Vehicle Configuration - Route Optimization{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1><i class="fas fa-truck me-2"></i>Vehicle Configuration</h1>
+            <div>
+                <button class="btn btn-success me-2" data-bs-toggle="modal" data-bs-target="#addVehicleModal">
+                    <i class="fas fa-plus me-2"></i>Add Vehicle
+                </button>
+                <a href="{{ url_for('index') }}" class="btn btn-outline-secondary">
+                    <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-list me-2"></i>Current Vehicle Fleet
+                    <span class="badge bg-primary ms-2" id="vehicle-count">{{ vehicles|length }}</span>
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if vehicles %}
+                <div class="table-responsive">
+                    <table class="table table-hover" id="vehicles-table">
+                        <thead>
+                            <tr>
+                                <th>Vehicle Type</th>
+                                <th>Capacity (kg)</th>
+                                <th>Max Locations</th>
+                                <th>Cost per km</th>
+                                <th>Max Distance (km)</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for vehicle in vehicles %}
+                            <tr data-vehicle-id="{{ vehicle.id }}">
+                                <td>{{ vehicle.vehicle_type }}</td>
+                                <td>{{ vehicle.capacity_kg }}</td>
+                                <td>{{ vehicle.max_locations }}</td>
+                                <td>₹{{ vehicle.cost_per_km }}</td>
+                                <td>{{ vehicle.max_distance_km }}</td>
+                                <td>
+                                    <button class="btn btn-sm btn-outline-primary me-1" 
+                                            onclick="editVehicle({{ vehicle.id }})">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-danger" 
+                                            onclick="deleteVehicle({{ vehicle.id }})">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center py-5">
+                    <i class="fas fa-truck fa-3x text-muted mb-3"></i>
+                    <h5 class="text-muted">No vehicles configured</h5>
+                    <p class="text-muted">Add your first vehicle to get started with route optimization.</p>
+                    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addVehicleModal">
+                        <i class="fas fa-plus me-2"></i>Add First Vehicle
+                    </button>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Start Optimization Section -->
+{% if vehicles %}
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-play me-2"></i>Start Route Optimization
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="hub-id" class="form-label">Hub ID</label>
+                            <input type="number" class="form-control" id="hub-id" value="{{ hub_id }}" readonly>
+                            <div class="form-text">This hub ID will be used for optimization</div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label class="form-label">CSV File</label>
+                            <div class="form-control-plaintext">
+                                <i class="fas fa-file-csv me-2"></i>{{ filename }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="d-grid">
+                    <button class="btn btn-success btn-lg" onclick="startOptimization()">
+                        <i class="fas fa-route me-2"></i>Start Route Optimization
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Add Vehicle Modal -->
+<div class="modal fade" id="addVehicleModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-plus me-2"></i>Add New Vehicle
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="add-vehicle-form">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="vehicle-type" class="form-label">Vehicle Type</label>
+                        <input type="text" class="form-control" id="vehicle-type" required>
+                        <div class="form-text">e.g., Small Van, Medium Truck, Large Truck</div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="capacity" class="form-label">Capacity (kg)</label>
+                        <input type="number" class="form-control" id="capacity" step="0.01" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="max-locations" class="form-label">Max Locations</label>
+                        <input type="number" class="form-control" id="max-locations" step="1" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="cost-per-km" class="form-label">Cost per km (₹)</label>
+                        <input type="number" class="form-control" id="cost-per-km" step="0.01" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="max-distance" class="form-label">Max Distance (km)</label>
+                        <input type="number" class="form-control" id="max-distance" step="0.01" required>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save me-2"></i>Add Vehicle
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Vehicle Modal -->
+<div class="modal fade" id="editVehicleModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-edit me-2"></i>Edit Vehicle
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="edit-vehicle-form">
+                <input type="hidden" id="edit-vehicle-id">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="edit-vehicle-type" class="form-label">Vehicle Type</label>
+                        <input type="text" class="form-control" id="edit-vehicle-type" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit-capacity" class="form-label">Capacity (kg)</label>
+                        <input type="number" class="form-control" id="edit-capacity" step="0.01" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit-max-locations" class="form-label">Max Locations</label>
+                        <input type="number" class="form-control" id="edit-max-locations" step="1" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit-cost-per-km" class="form-label">Cost per km (₹)</label>
+                        <input type="number" class="form-control" id="edit-cost-per-km" step="0.01" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit-max-distance" class="form-label">Max Distance (km)</label>
+                        <input type="number" class="form-control" id="edit-max-distance" step="0.01" required>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save me-2"></i>Update Vehicle
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Optimization confirmation alert container -->
+<div id="opt-alert-container"></div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Add vehicle form handler
+    document.getElementById('add-vehicle-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        addVehicle();
+    });
+    
+    // Edit vehicle form handler
+    document.getElementById('edit-vehicle-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        updateVehicle();
+    });
+});
+
+function addVehicle() {
+    const formData = {
+        vehicle_type: document.getElementById('vehicle-type').value,
+        capacity_kg: parseFloat(document.getElementById('capacity').value),
+        max_locations: parseInt(document.getElementById('max-locations').value),
+        cost_per_km: parseFloat(document.getElementById('cost-per-km').value),
+        max_distance_km: parseFloat(document.getElementById('max-distance').value)
+    };
+    
+    fetch(`/api/vehicles/{{ hub_id }}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            location.reload();
+        } else {
+            alert('Error: ' + data.message);
+        }
+    })
+    .catch(error => {
+        alert('Error adding vehicle: ' + error.message);
+    });
+}
+
+function editVehicle(vehicleId) {
+    // Get vehicle data from the table row
+    const row = document.querySelector(`tr[data-vehicle-id="${vehicleId}"]`);
+    const cells = row.querySelectorAll('td');
+    
+    document.getElementById('edit-vehicle-id').value = vehicleId;
+    document.getElementById('edit-vehicle-type').value = cells[0].textContent;
+    document.getElementById('edit-capacity').value = cells[1].textContent;
+    document.getElementById('edit-max-locations').value = cells[2].textContent;
+    document.getElementById('edit-cost-per-km').value = cells[3].textContent.replace('₹', '');
+    document.getElementById('edit-max-distance').value = cells[4].textContent;
+    
+    new bootstrap.Modal(document.getElementById('editVehicleModal')).show();
+}
+
+function updateVehicle() {
+    const vehicleId = document.getElementById('edit-vehicle-id').value;
+    const formData = {
+        id: parseInt(vehicleId),
+        vehicle_type: document.getElementById('edit-vehicle-type').value,
+        capacity_kg: parseFloat(document.getElementById('edit-capacity').value),
+        max_locations: parseInt(document.getElementById('edit-max-locations').value),
+        cost_per_km: parseFloat(document.getElementById('edit-cost-per-km').value),
+        max_distance_km: parseFloat(document.getElementById('edit-max-distance').value)
+    };
+    
+    fetch(`/api/vehicles/{{ hub_id }}`, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            location.reload();
+        } else {
+            alert('Error: ' + data.message);
+        }
+    })
+    .catch(error => {
+        alert('Error updating vehicle: ' + error.message);
+    });
+}
+
+function deleteVehicle(vehicleId) {
+    if (confirm('Are you sure you want to delete this vehicle?')) {
+        fetch(`/api/vehicles/{{ hub_id }}?id=${vehicleId}`, {
+            method: 'DELETE'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                location.reload();
+            } else {
+                alert('Error: ' + data.message);
+            }
+        })
+        .catch(error => {
+            alert('Error deleting vehicle: ' + error.message);
+        });
+    }
+}
+
+function startOptimization() {
+    // Submit optimization job using csv_route_ui.py endpoint
+    fetch('/optimize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+            filename: '{{ filename }}',
+            hub_id: {{ hub_id }}
+        })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.status === 'success') {
+            const jobId = data.job_id;
+            const container = document.getElementById('opt-alert-container');
+            container.innerHTML = `
+                <div class="alert alert-success alert-dismissible fade show mt-3" role="alert">
+                    <i class="fas fa-check-circle me-2"></i>
+                    Route optimization job <code>#${jobId}</code> submitted successfully.
+                    <br><small>Check status: <a href="/api/optimization-status/${jobId}" target="_blank">/api/optimization-status/${jobId}</a></small>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>`;
+        } else {
+            alert(data.message || 'Failed to submit optimization job');
+        }
+    })
+    .catch(err => alert('Error submitting job: ' + err.message));
+}
+</script>
+{% endblock %}
