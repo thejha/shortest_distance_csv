@@ -77,7 +77,7 @@ warnings.filterwarnings('ignore')
 # API clients & globals
 # ------------------------------------------------
 if GOOGLEMAPS_AVAILABLE:
-    gmaps = googlemaps.Client(key='AIzaSyDMtTPCRVzDEyv-rcwk6BNIWZi4-bI-WZo')
+    gmaps = googlemaps.Client(key='AIzaSyDMtTPCRVzDEyv-rcwk6')
 else:
     gmaps = None
 
