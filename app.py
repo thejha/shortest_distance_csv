@@ -146,6 +146,150 @@ def validate_csv_structure(file_path):
             'columns': []
         }
 
+def validate_weights_against_vehicle_capacity(file_path, hub_id):
+    """
+    Validate that grouped weights at each location don't exceed available vehicle capacity.
+    This prevents optimization failures due to overweight locations.
+    
+    Args:
+        file_path: Path to CSV file
+        hub_id: Hub ID to check vehicle configurations
+        
+    Returns:
+        dict with validation results including locations exceeding capacity
+    """
+    try:
+        df = pd.read_csv(file_path)
+        
+        validation_result = {
+            'is_valid': True,
+            'errors': [],
+            'warnings': [],
+            'overweight_locations': []
+        }
+        
+        # Check if required columns exist
+        if 'material_quantity' not in df.columns or 'state_name' not in df.columns or 'location_pincode' not in df.columns:
+            validation_result['warnings'].append("Cannot validate capacity: missing required columns")
+            return validation_result
+        
+        # Clean and format data
+        df['state_name'] = df['state_name'].str.upper()
+        df['material_quantity'] = pd.to_numeric(df['material_quantity'], errors='coerce')
+        df = df.dropna(subset=['material_quantity', 'state_name', 'location_pincode'])
+        
+        # Create source_state_pincode
+        df['source_state_pincode'] = (
+            df['state_name'] + '+' + df['location_pincode'].astype(str)
+        )
+        
+        # Group by location and sum weights
+        location_weights = (
+            df.groupby('source_state_pincode')['material_quantity']
+            .sum()
+            .reset_index()
+        )
+        location_weights.columns = ['location', 'total_weight']
+        
+        # Load vehicle configurations for this hub
+        try:
+            with mysql_cursor(dict_rows=True) as cur:
+                cur.execute("""
+                    SELECT vehicle_type, capacity_kg 
+                    FROM vehicle_configs 
+                    WHERE hub_id = %s AND is_active = TRUE
+                    ORDER BY capacity_kg DESC
+                """, (hub_id,))
+                vehicles = cur.fetchall()
+        except Exception as e:
+            print(f"Warning: Could not load vehicles from database: {e}")
+            vehicles = []
+        
+        if not vehicles:
+            validation_result['warnings'].append(
+                f"No vehicles configured for Hub {hub_id}. Please configure vehicles before optimization."
+            )
+            return validation_result
+        
+        # Get maximum vehicle capacity
+        max_capacity = max(float(v['capacity_kg']) for v in vehicles)
+        
+        # Check each location's total weight
+        overweight_locations = []
+        for _, row in location_weights.iterrows():
+            location = row['location']
+            total_weight = row['total_weight']
+            
+            if total_weight > max_capacity:
+                overweight_locations.append({
+                    'location': location,
+                    'total_weight': float(total_weight),
+                    'max_capacity': float(max_capacity),
+                    'excess_weight': float(total_weight - max_capacity)
+                })
+        
+        if overweight_locations:
+            validation_result['is_valid'] = False
+            validation_result['overweight_locations'] = overweight_locations
+            
+            # Create detailed error message
+            error_details = []
+            for loc in overweight_locations[:5]:  # Show first 5
+                error_details.append(
+                    f"{loc['location']}: {loc['total_weight']:.0f} kg "
+                    f"(exceeds max capacity of {loc['max_capacity']:.0f} kg by {loc['excess_weight']:.0f} kg)"
+                )
+            
+            if len(overweight_locations) > 5:
+                error_details.append(f"... and {len(overweight_locations) - 5} more locations")
+            
+            validation_result['errors'].append(
+                f"Found {len(overweight_locations)} location(s) with total weight exceeding all available vehicle capacities. " +
+                "Please split these shipments into multiple pickups or configure larger vehicles. " +
+                "Locations: " + "; ".join(error_details)
+            )
+        
+        # Also check for locations that are close to max capacity (warning)
+        near_capacity_locations = []
+        capacity_threshold = max_capacity * 0.95  # 95% of max capacity
+        for _, row in location_weights.iterrows():
+            location = row['location']
+            total_weight = row['total_weight']
+            
+            if capacity_threshold < total_weight <= max_capacity:
+                near_capacity_locations.append({
+                    'location': location,
+                    'total_weight': float(total_weight),
+                    'max_capacity': float(max_capacity),
+                    'percentage': float((total_weight / max_capacity) * 100)
+                })
+        
+        if near_capacity_locations:
+            warning_details = []
+            for loc in near_capacity_locations[:3]:  # Show first 3
+                warning_details.append(
+                    f"{loc['location']}: {loc['total_weight']:.0f} kg "
+                    f"({loc['percentage']:.1f}% of max capacity)"
+                )
+            
+            if len(near_capacity_locations) > 3:
+                warning_details.append(f"... and {len(near_capacity_locations) - 3} more")
+            
+            validation_result['warnings'].append(
+                f"Found {len(near_capacity_locations)} location(s) near maximum vehicle capacity. " +
+                "Locations: " + "; ".join(warning_details)
+            )
+        
+        return validation_result
+        
+    except Exception as e:
+        return {
+            'is_valid': True,  # Don't block on validation errors
+            'errors': [],
+            'warnings': [f"Could not validate vehicle capacity: {str(e)}"],
+            'overweight_locations': []
+        }
+
 
 @app.route("/")
 def index():
@@ -344,10 +488,12 @@ def upload_csv():
                     validation['is_valid'] = False
                     validation['errors'].append('Please select a Hub from the dropdown before uploading.')
                 else:
-                    # Redirect to vehicle configuration to ensure client navigation succeeds
+                    # CSV structure is valid - redirect to vehicle configuration
                     flash('CSV file uploaded and validated successfully!', 'success')
                     return redirect(url_for('vehicle_config', filename=filename, hub_id=hub_id_int))
-            else:
+            
+            # Validation failed
+            if not validation['is_valid']:
                 flash('CSV validation failed', 'error')
                 return render_template('upload_result.html', 
                                     filename=filename, 
@@ -411,13 +557,45 @@ def start_optimization():
     if not filename or not hub_id:
         return jsonify({'status': 'error', 'message': 'Missing filename or hub_id'}), 400
     
-    # Generate unique job ID
-    job_id = str(uuid.uuid4())
+    # Validate file path
+    input_file = os.path.join(UPLOAD_FOLDER, filename)
+    if not os.path.exists(input_file):
+        return jsonify({'status': 'error', 'message': 'Input file not found'}), 400
+    
+    # Validate weights against vehicle capacity BEFORE starting optimization
+    try:
+        capacity_validation = validate_weights_against_vehicle_capacity(input_file, hub_id)
+        
+        if not capacity_validation['is_valid']:
+            # Build detailed error message with overweight locations
+            error_message = "Cannot start optimization: Some locations exceed available vehicle capacity.\n\n"
+            
+            if capacity_validation.get('overweight_locations'):
+                error_message += "Overweight Locations:\n"
+                for loc in capacity_validation['overweight_locations']:
+                    error_message += f"• {loc['location']}: {loc['total_weight']:.0f} kg "
+                    error_message += f"(exceeds max capacity of {loc['max_capacity']:.0f} kg)\n"
+                
+                error_message += f"\nPlease either:\n"
+                error_message += f"1. Add a vehicle with capacity > {max(loc['total_weight'] for loc in capacity_validation['overweight_locations']):.0f} kg for this hub\n"
+                error_message += f"2. Split the shipments at these locations into multiple pickup entries"
+            
+            return jsonify({
+                'status': 'error', 
+                'message': error_message,
+                'overweight_locations': capacity_validation.get('overweight_locations', [])
+            }), 400
+    
+    except Exception as e:
+        # Don't block optimization if validation itself fails
+        print(f"Warning: Capacity validation failed: {e}")
+    
+    # Generate unique job ID (shortened to 8 characters)
+    job_id = str(uuid.uuid4())[:8]
     
     # Create job record
     try:
         with mysql_cursor() as cur:
-            input_file = os.path.join(UPLOAD_FOLDER, filename)
             output_file = os.path.join(RESULTS_FOLDER, f"optimized_{job_id}.csv")
             
             cur.execute("""
