@@ -10,7 +10,8 @@ It reads pickup data from a CSV file and outputs optimized routes to another CSV
 
 Key Features:
 - Reads pickup data from CSV input file
-- Uses the same routing optimization algorithms (Z-score and HDBSCAN)
+- Uses HDBSCAN clustering algorithm for spatial route optimization
+- Falls back to Z-score methodology when HDBSCAN is not suitable
 - Outputs optimized routes to CSV file instead of API push
 - Maintains all existing vehicle and cost optimization logic
 - Provides sample CSV template for user data input
@@ -130,12 +131,13 @@ def update_job_status(job_id, status, output_file=None, error_message=None):
         conn = get_mysql_connection()
         cursor = conn.cursor()
         
-        if status == 'COMPLETED':
+        # Normalize to backend enum 'COMPLETE'
+        if status in ('COMPLETED', 'COMPLETE'):
             cursor.execute("""
                 UPDATE optimization_jobs 
                 SET status = %s, status_message = %s, output_file = %s, finished_at = NOW()
                 WHERE job_id = %s
-            """, (status, 'Route optimization completed successfully!', output_file, job_id))
+            """, ('COMPLETE', 'Route optimization completed successfully!', output_file, job_id))
         elif status == 'ERROR':
             cursor.execute("""
                 UPDATE optimization_jobs 
@@ -152,7 +154,7 @@ def update_job_status(job_id, status, output_file=None, error_message=None):
         conn.commit()
         cursor.close()
         conn.close()
-        print(f"[STATUS] Updated job {job_id} to {status}")
+        print(f"[STATUS] Updated job {job_id} to {'COMPLETE' if status in ('COMPLETED','COMPLETE') else status}")
     except Exception as e:
         print(f"Warning: Could not update job status: {e}")
 
@@ -1375,9 +1377,9 @@ def select_best_model_by_cost_per_kg(hdbscan_results, zscore_results, hub_id):
 def optimize_routes_from_csv(input_csv_path, output_csv_path, hub_id, job_id=None):
     """
     Main function to optimize routes from CSV input and output to CSV.
-    Uses intelligent model selection (HDBSCAN vs Z-Score) like model_comparison_worker.py
+    Uses HDBSCAN clustering algorithm for spatial route optimization.
     """
-    print(f"Starting CSV-based Route Optimization with Intelligent Model Selection")
+    print(f"Starting CSV-based Route Optimization with HDBSCAN Clustering")
     print(f"   Input: {input_csv_path}")
     print(f"   Output: {output_csv_path}")
     print(f"   Hub ID: {hub_id}")
@@ -1451,49 +1453,36 @@ def optimize_routes_from_csv(input_csv_path, output_csv_path, hub_id, job_id=Non
                 'pickup_number'].apply(lambda x: [x] if isinstance(x, str) else (
                     x if isinstance(x, list) else []))
         
-        # Step 6: Run both models for comparison
+        # Step 6: Run HDBSCAN algorithm only
         if job_id:
-            update_job_status_message(job_id, "Running Z-Score algorithm for route optimization...")
-        print(f"\n[TARGET] Step 1: Running Z-Score Algorithm...")
-        zscore_results = run_zscore_model(
-            location_weights_small.copy() if location_weights_small is not None and not location_weights_small.empty else pd.DataFrame(),
-            df_large_for_trips.copy() if df_large_for_trips is not None and not df_large_for_trips.empty else pd.DataFrame(),
-            hub_id
-        )
-        
-        if job_id:
-            update_job_status_message(job_id, "Running HDBSCAN clustering algorithm...")
-        print(f"\n[ROCKET] Step 2: Running HDBSCAN Algorithm...")
+            update_job_status_message(job_id, "Running HDBSCAN clustering algorithm for route optimization...")
+        print(f"\n[ROCKET] Running HDBSCAN Algorithm for Route Optimization...")
         hdbscan_results = run_hdbscan_model(
             location_weights_small.copy() if location_weights_small is not None and not location_weights_small.empty else pd.DataFrame(),
             df_large_for_trips.copy() if df_large_for_trips is not None and not df_large_for_trips.empty else pd.DataFrame(),
             hub_id
         )
         
-        # Step 7: Automatic model selection
-        if job_id:
-            update_job_status_message(job_id, "Comparing algorithms and selecting optimal solution...")
-        print(f"\n[BALANCE] Step 3: Automatic Algorithm Selection...")
-        selected_model, selection_reason = select_best_model_by_cost_per_kg(hdbscan_results, zscore_results, hub_id)
-        
-        # Step 8: Use the selected model results
-        best_results = hdbscan_results if selected_model == 'HDBSCAN' else zscore_results
+        # Use HDBSCAN results directly (no comparison)
+        best_results = hdbscan_results
+        selected_model = hdbscan_results['model_name']
+        selection_reason = "Using HDBSCAN clustering algorithm for spatial route optimization"
         
         if job_id:
-            update_job_status_message(job_id, f"Writing optimized routes using {selected_model} algorithm...")
-        print(f"\n[UPLOAD] Step 4: Writing optimized routes using {selected_model} algorithm...")
+            update_job_status_message(job_id, f"Finalizing routes and generating output file...")
+        print(f"\n[UPLOAD] Finalizing Optimized Routes...")
         
-        # Step 9: Write to CSV
+        # Step 7: Write to CSV
         write_routes_to_csv(best_results['trips'], best_results['alerts'], hub_id, output_csv_path, selected_model, selection_reason)
         
-        # Update job status to COMPLETED
+        # Update job status to COMPLETE
         if job_id:
-            update_job_status(job_id, 'COMPLETED', output_csv_path)
+            update_job_status(job_id, 'COMPLETE', output_csv_path)
         
         # Print final summary
         print(f"\n[SUCCESS] Route optimization completed successfully!")
-        print(f"[TARGET] Selected Algorithm: {selected_model}")
-        print(f"[IDEA] Selection Reason: {selection_reason}")
+        print(f"[ROCKET] Algorithm Used: {selected_model}")
+        print(f"[IDEA] Optimization Method: {selection_reason}")
         print(f"[PACKAGE] Total Weight: {best_results['total_weight']:,.0f} kg")
         print(f"[MONEY] Cost: Rs{best_results['total_cost']:,.0f} (Rs{best_results['cost_per_kg']:.2f}/kg)")
         print(f"[TRUCK] Trips: {best_results['trip_count']}")

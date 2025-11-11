@@ -242,6 +242,7 @@ function getDefaultStatusMessage(status) {
         'PENDING': 'Queued for processing...',
         'RUNNING': 'Processing optimization...',
         'COMPLETED': 'Route optimization completed successfully',
+        'COMPLETE': 'Route optimization completed successfully',
         'ERROR': 'Route optimization failed'
     };
     return messages[status] || 'Unknown status';
@@ -374,15 +375,18 @@ function loadDashboardData() {
             const tbody = document.querySelector('#jobs-table tbody');
             if (data.recent_jobs && data.recent_jobs.length > 0) {
                 tbody.innerHTML = data.recent_jobs.map(job => {
-                    const statusClass = {
+                    const statusMap = {
                         'COMPLETED': 'success',
+                        'COMPLETE': 'success',
                         'RUNNING': 'warning', 
                         'ERROR': 'danger',
                         'PENDING': 'info'
-                    }[job.status] || 'secondary';
+                    };
+                    const statusClass = statusMap[job.status] || 'secondary';
                     
                     // Show actions for completed jobs or jobs with results (even if marked as ERROR)
-                    const hasResults = job.status === 'COMPLETED' || (job.status === 'ERROR' && job.finished_at);
+                    const isCompleted = job.status === 'COMPLETED' || job.status === 'COMPLETE';
+                    const hasResults = isCompleted || (job.status === 'ERROR' && job.finished_at);
                     const actions = hasResults 
                         ? `<div class="btn-group" role="group">
                                 <a href="/download/${job.job_id}" class="btn btn-sm btn-success" title="Download CSV Results">
